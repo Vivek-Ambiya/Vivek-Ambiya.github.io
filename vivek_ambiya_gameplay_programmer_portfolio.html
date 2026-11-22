@@ -1,0 +1,1489 @@
+<!DOCTYPE html>
+<html lang="en" class="dark scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vivek Ambiya | Gameplay Programmer (Unity C# & Unreal C++)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            obsidian: '#090B10',
+            surface: '#111622',
+            surfaceLight: '#182032',
+            cyanEngine: '#00F0FF',
+            emeraldTelemetry: '#10B981',
+            amberWarn: '#F59E0B',
+            purpleUnreal: '#A855F7'
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            display: ['Space Grotesk', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* Custom Telemetry HUD & Animation Styles */
+    :root {
+      --bg-obsidian: #090B10;
+      --bg-surface: #111622;
+      --accent-cyan: #00F0FF;
+    }
+
+    body {
+      background-color: #090B10;
+      color: #E2E8F0;
+      overflow-x: hidden;
+    }
+
+    /* Subtle HUD Grid Pattern */
+    .hud-grid {
+      background-size: 40px 40px;
+      background-image: 
+        linear-gradient(to right, rgba(0, 240, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 240, 255, 0.035) 1px, transparent 1px);
+    }
+
+    /* Glassmorphism HUD Panels */
+    .hud-panel {
+      background: rgba(17, 22, 34, 0.78);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(0, 240, 255, 0.14);
+      box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7);
+      transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .hud-panel:hover {
+      border-color: rgba(0, 240, 255, 0.42);
+      box-shadow: 0 14px 36px -10px rgba(0, 240, 255, 0.14);
+    }
+
+    /* Corner Reticle Accents */
+    .reticle-box {
+      position: relative;
+    }
+    .reticle-box::before,
+    .reticle-box::after {
+      content: '';
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-color: #00F0FF;
+      border-style: solid;
+      opacity: 0.45;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+    .reticle-box::before {
+      top: -1px;
+      left: -1px;
+      border-width: 2px 0 0 2px;
+      border-top-left-radius: 0.75rem;
+    }
+    .reticle-box::after {
+      bottom: -1px;
+      right: -1px;
+      border-width: 0 2px 2px 0;
+      border-bottom-right-radius: 0.75rem;
+    }
+    .reticle-box:hover::before,
+    .reticle-box:hover::after {
+      opacity: 1;
+    }
+
+    /* Scroll Reveal Animation */
+    .reveal {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1), transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Skill Bar Animation */
+    .skill-fill {
+      width: 0%;
+      transition: width 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #090B10;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #1E293B;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #00F0FF;
+    }
+
+    /* Scanline overlay on video previews */
+    .scanlines {
+      background: linear-gradient(
+        rgba(18, 16, 16, 0) 50%, 
+        rgba(0, 0, 0, 0.28) 50%
+      );
+      background-size: 100% 4px;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(0, 240, 255, 0.4); }
+      50% { box-shadow: 0 0 0 6px rgba(0, 240, 255, 0); }
+    }
+    .live-dot {
+      animation: pulseGlow 2s infinite;
+    }
+  </style>
+</head>
+<body class="font-sans antialiased selection:bg-cyanEngine selection:text-obsidian hud-grid">
+
+  <!-- Toast Notification Container (Replaces alert) -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Navigation Header -->
+  <header class="fixed top-0 inset-x-0 z-40 bg-obsidian/85 backdrop-blur-md border-b border-cyanEngine/15">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <!-- Brand / Engine Tag -->
+      <a href="#hero" class="flex items-center gap-3 group">
+        <div class="w-9 h-9 rounded-lg bg-surface border border-cyanEngine/40 flex items-center justify-center text-cyanEngine font-mono font-bold text-sm group-hover:bg-cyanEngine group-hover:text-obsidian transition-colors">
+          VA
+        </div>
+        <div class="flex flex-col">
+          <span class="font-display font-bold text-white tracking-wide text-sm sm:text-base leading-none">VIVEK AMBIYA</span>
+          <span class="font-mono text-[11px] text-cyanEngine/80 mt-0.5">GAMEPLAY.ENGINEER</span>
+        </div>
+      </a>
+
+      <!-- Desktop Navigation -->
+      <nav class="hidden md:flex items-center gap-7 text-sm font-medium text-slate-300">
+        <a href="#projects" class="hover:text-cyanEngine transition-colors">Projects & Media</a>
+        <a href="#skills" class="hover:text-cyanEngine transition-colors">Tech Matrix</a>
+        <a href="#experience" class="hover:text-cyanEngine transition-colors">Experience</a>
+        <a href="#contact" class="hover:text-cyanEngine transition-colors">Contact</a>
+      </nav>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-2 sm:gap-3">
+        <button onclick="openCustomizerModal()" class="px-3 py-1.5 rounded-lg bg-surfaceLight/90 hover:bg-cyanEngine/15 border border-cyanEngine/35 text-cyanEngine font-mono text-xs flex items-center gap-1.5 transition-all cursor-pointer" title="Add your own YouTube videos, MP4s, screenshots & links">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+          <span class="hidden sm:inline">Customize Media</span>
+          <span class="sm:hidden">Media</span>
+        </button>
+        <a href="#contact" class="px-3.5 py-1.5 rounded-lg bg-cyanEngine text-obsidian font-semibold text-xs sm:text-sm hover:bg-cyan-300 transition-colors">
+          Hire / Contact
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO SECTION WITH INTERACTIVE 2D PHYSICS & AI TELEMETRY CANVAS -->
+  <section id="hero" class="relative min-h-screen pt-24 pb-16 flex flex-col justify-between overflow-hidden">
+    <!-- Interactive Canvas Layer -->
+    <div id="canvasContainer" class="absolute inset-0 z-0">
+      <canvas id="telemetryCanvas" class="w-full h-full block"></canvas>
+      <!-- Gradient Vignette for Readability -->
+      <div class="absolute inset-0 bg-gradient-to-b from-obsidian/55 via-obsidian/35 to-obsidian pointer-events-none"></div>
+      <div class="absolute inset-0 bg-gradient-to-r from-obsidian/90 via-obsidian/50 to-transparent pointer-events-none"></div>
+    </div>
+
+    <!-- Live Engine Telemetry HUD Badge (Top Right of Hero) -->
+    <div class="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 flex justify-end mb-4">
+      <div class="hud-panel rounded-xl px-3.5 py-2 flex items-center gap-3 font-mono text-xs">
+        <span class="w-2 h-2 rounded-full bg-emeraldTelemetry live-dot"></span>
+        <span id="fpsCounter" class="text-emeraldTelemetry font-semibold">60 FPS</span>
+        <span class="text-slate-500">|</span>
+        <span id="frameTimeCounter" class="text-cyanEngine">16.6 ms</span>
+        <span class="text-slate-500 hidden sm:inline">|</span>
+        <span class="text-slate-400 hidden sm:inline">Click canvas: Spawn Impulse</span>
+        <button id="toggleSimBtn" onclick="toggleSimulation()" class="ml-1 px-2 py-0.5 rounded bg-surfaceLight hover:bg-cyanEngine/20 text-slate-200 border border-slate-700 transition-colors cursor-pointer">
+          Pause
+        </button>
+      </div>
+    </div>
+
+    <!-- Hero Foreground Content -->
+    <div class="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 my-auto">
+      <div class="max-w-3xl">
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface/90 border border-cyanEngine/30 font-mono text-xs text-cyanEngine mb-6">
+          <span>[UNITY C#]</span>
+          <span class="text-slate-500">•</span>
+          <span>[UNREAL ENGINE C++]</span>
+          <span class="text-slate-500">•</span>
+          <span class="text-emeraldTelemetry">PHYSICS & AI SYSTEMS</span>
+        </div>
+
+        <h1 class="font-display text-4xl sm:text-6xl lg:text-7xl font-bold text-white tracking-tight leading-[1.08]">
+          VIVEK <span class="text-transparent bg-clip-text bg-gradient-to-r from-cyanEngine via-sky-400 to-emeraldTelemetry">AMBIYA</span>
+        </h1>
+
+        <p class="mt-3 font-display text-xl sm:text-2xl text-slate-200 font-medium">
+          Gameplay Programmer &amp; Systems Architect
+        </p>
+
+        <p class="mt-5 text-slate-300 text-base sm:text-lg leading-relaxed max-w-2xl">
+          Gameplay Programmer with <span class="text-white font-semibold">3+ years of hands-on experience</span> designing, implementing, and optimizing interactive gameplay systems across <span class="text-cyanEngine font-medium">Unity (C#)</span> and <span class="text-purpleUnreal font-medium">Unreal Engine (C++)</span>. Specialized in player mechanics, physics simulations, AI perception/behavior trees, and modular event-driven architectures built for high-framerate production.
+        </p>
+
+        <!-- Location & Quick Links -->
+        <div class="mt-6 flex flex-wrap items-center gap-4 text-xs sm:text-sm font-mono text-slate-400">
+          <span class="flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-cyanEngine" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            Ahmedabad / Indore, India
+          </span>
+          <span class="text-slate-600">|</span>
+          <button onclick="copyText('vivekambiya804@gmail.com', 'Email')" class="hover:text-cyanEngine flex items-center gap-1.5 transition-colors cursor-pointer">
+            <svg class="w-4 h-4 text-cyanEngine" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+            vivekambiya804@gmail.com
+          </button>
+        </div>
+
+        <!-- CTA Row -->
+        <div class="mt-8 flex flex-wrap items-center gap-3.5">
+          <a href="#projects" class="px-6 py-3.5 rounded-xl bg-cyanEngine text-obsidian font-display font-bold text-sm sm:text-base hover:bg-cyan-300 transition-all shadow-lg shadow-cyanEngine/20 flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Explore Gameplay Reels
+          </a>
+
+          <a id="heroLinkedinLink" href="https://www.linkedin.com" target="_blank" rel="noopener noreferrer" class="px-5 py-3.5 rounded-xl hud-panel text-slate-200 hover:text-cyanEngine font-mono text-xs sm:text-sm flex items-center gap-2">
+            <span>LinkedIn</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+          </a>
+
+          <a id="heroGithubLink" href="https://github.com" target="_blank" rel="noopener noreferrer" class="px-5 py-3.5 rounded-xl hud-panel text-slate-200 hover:text-cyanEngine font-mono text-xs sm:text-sm flex items-center gap-2">
+            <span>GitHub / Itch.io</span>
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Key Impact Metrics Strip -->
+    <div class="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 mt-14">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5">
+        <div class="hud-panel reticle-box rounded-xl p-4 sm:p-5">
+          <div class="font-mono text-xs text-slate-400 uppercase tracking-wider">Production Experience</div>
+          <div class="mt-1 font-display text-2xl sm:text-3xl font-bold text-white flex items-baseline gap-1">
+            <span class="counter" data-target="3">0</span><span class="text-cyanEngine">+ Years</span>
+          </div>
+          <div class="mt-1 font-mono text-[11px] text-emeraldTelemetry">Unity C# &amp; Unreal C++</div>
+        </div>
+
+        <div class="hud-panel reticle-box rounded-xl p-4 sm:p-5">
+          <div class="font-mono text-xs text-slate-400 uppercase tracking-wider">Architecture Stability</div>
+          <div class="mt-1 font-display text-2xl sm:text-3xl font-bold text-white flex items-baseline gap-1">
+            <span class="text-cyanEngine">+</span><span class="counter" data-target="70">0</span><span class="text-cyanEngine">%</span>
+          </div>
+          <div class="mt-1 font-mono text-[11px] text-slate-400">Event-driven decoupling</div>
+        </div>
+
+        <div class="hud-panel reticle-box rounded-xl p-4 sm:p-5">
+          <div class="font-mono text-xs text-slate-400 uppercase tracking-wider">FPS Drop Reduction</div>
+          <div class="mt-1 font-display text-2xl sm:text-3xl font-bold text-white flex items-baseline gap-1">
+            <span class="text-emeraldTelemetry">-</span><span class="counter" data-target="50">0</span><span class="text-emeraldTelemetry">%</span>
+          </div>
+          <div class="mt-1 font-mono text-[11px] text-slate-400">Pooling &amp; LOD optimization</div>
+        </div>
+
+        <div class="hud-panel reticle-box rounded-xl p-4 sm:p-5">
+          <div class="font-mono text-xs text-slate-400 uppercase tracking-wider">Defects Resolved</div>
+          <div class="mt-1 font-display text-2xl sm:text-3xl font-bold text-white flex items-baseline gap-1">
+            <span class="counter" data-target="50">0</span><span class="text-amberWarn">+</span>
+          </div>
+          <div class="mt-1 font-mono text-[11px] text-slate-400">30% drop in live QA issues</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- KEY GAMEPLAY & ENGINE PROJECTS (WITH VIDEO & SCREENSHOT GALLERIES) -->
+  <section id="projects" class="py-20 relative">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <!-- Section Header -->
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 reveal">
+        <div>
+          <div class="font-mono text-xs text-cyanEngine uppercase tracking-widest mb-2">// GAMEPLAY_SHOWCASE &amp; MEDIA_REELS</div>
+          <h2 class="font-display text-3xl sm:text-4xl font-bold text-white">Engine &amp; Gameplay Projects</h2>
+          <p class="mt-2 text-slate-400 max-w-2xl text-sm sm:text-base">
+            Inspect gameplay reels, screenshot captures, and underlying system architectures across Unreal Engine (C++) and Unity (C#). Click <span class="text-cyanEngine font-mono">Inspect Media</span> on any build to launch the full-screen video &amp; gallery viewer.
+          </p>
+        </div>
+
+        <!-- Category Filter Tabs -->
+        <div class="flex flex-wrap gap-2" id="filterTabs">
+          <button onclick="filterProjects('all')" data-filter="all" class="filter-btn active px-3.5 py-2 rounded-lg font-mono text-xs bg-cyanEngine text-obsidian font-semibold transition-all cursor-pointer">
+            All Builds (7)
+          </button>
+          <button onclick="filterProjects('unreal')" data-filter="unreal" class="filter-btn px-3.5 py-2 rounded-lg font-mono text-xs bg-surface text-slate-300 border border-slate-700 hover:border-purpleUnreal transition-all cursor-pointer">
+            Unreal C++
+          </button>
+          <button onclick="filterProjects('unity')" data-filter="unity" class="filter-btn px-3.5 py-2 rounded-lg font-mono text-xs bg-surface text-slate-300 border border-slate-700 hover:border-cyanEngine transition-all cursor-pointer">
+            Unity C#
+          </button>
+          <button onclick="filterProjects('physics')" data-filter="physics" class="filter-btn px-3.5 py-2 rounded-lg font-mono text-xs bg-surface text-slate-300 border border-slate-700 hover:border-emeraldTelemetry transition-all cursor-pointer">
+            Physics &amp; Perf
+          </button>
+        </div>
+      </div>
+
+      <!-- Projects Grid -->
+      <div id="projectsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Populated dynamically via JS so Customizer updates live -->
+      </div>
+    </div>
+  </section>
+
+  <!-- TECHNICAL SKILLS MATRIX -->
+  <section id="skills" class="py-20 bg-surface/40 border-y border-cyanEngine/10 relative">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="mb-12 reveal">
+        <div class="font-mono text-xs text-cyanEngine uppercase tracking-widest mb-2">// ENGINE_CAPABILITIES</div>
+        <h2 class="font-display text-3xl sm:text-4xl font-bold text-white">Technical Skills Matrix</h2>
+        <p class="mt-2 text-slate-400 max-w-2xl text-sm sm:text-base">
+          Full-lifecycle gameplay engineering toolkit spanning low-level C++/C# programming, real-time physics, networked multiplayer, and mobile/PC frame-time profiling.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="skillsGrid">
+        <!-- Skill Category 1 -->
+        <div class="hud-panel rounded-2xl p-6 reveal">
+          <div class="flex items-center justify-between mb-4">
+            <span class="font-mono text-xs px-2.5 py-1 rounded bg-cyanEngine/15 text-cyanEngine border border-cyanEngine/30">01 // CORE &amp; ENGINES</span>
+            <span class="font-mono text-xs text-slate-400">C# / C++</span>
+          </div>
+          <h3 class="font-display text-lg font-bold text-white mb-4">Programming &amp; Game Engines</h3>
+          <div class="space-y-3 mb-5">
+            <div>
+              <div class="flex justify-between font-mono text-xs mb-1">
+                <span class="text-slate-200">Unity 3D (C#)</span>
+                <span class="text-cyanEngine">95%</span>
+              </div>
+              <div class="h-1.5 bg-obsidian rounded-full overflow-hidden">
+                <div class="skill-fill h-full bg-gradient-to-r from-cyanEngine to-emeraldTelemetry rounded-full" data-width="95%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between font-mono text-xs mb-1">
+                <span class="text-slate-200">Unreal Engine (C++ &amp; Blueprints)</span>
+                <span class="text-purpleUnreal">85%</span>
+              </div>
+              <div class="h-1.5 bg-obsidian rounded-full overflow-hidden">
+                <div class="skill-fill h-full bg-gradient-to-r from-purpleUnreal to-cyanEngine rounded-full" data-width="85%"></div>
+              </div>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <span class="px-2.5 py-1 rounded-md bg-obsidian border border-slate-800 font-mono text-xs text-slate-300">C#</span>
+            <span class="px-2.5 py-1 rounded-md bg-obsidian border border-slate-800 font-mono text-xs text-slate-300">C++</span>
+            <span class="px-2.5 py-1 rounded-md bg-obsidian border border-slate-800 font-mono text-xs text-slate-300">Unity 3D</span>
+            <span class="px-2.5 py-1 rounded-md bg-obsidian border border-slate-800 font-mono text-xs text-slate-300">Unreal Engine</span>
+            <span class="px-2.5 py-1 rounded-md bg-obsidian border border-slate-800 font-mono text-xs text-slate-300">Lua</span>
+            <span class="px-2.5 py-1 rounded-md bg-obsidian border border-slate-800 font-mono text-xs text-slate-300">Roblox Studio</span>
+          </div>
+        </div>
+
+        <!-- Skill Category 2 -->
+        <div class="hud-panel rounded-2xl p-6 reveal">
+          <div class="flex items-center justify-between mb-4">
+            <span class="font-mono text-xs px-2.5 py-1 rounded bg-emeraldTelemetry/15 text-emeraldTelemetry border border-emeraldTelemetry/30">02 // MECHANICS &amp; AI</span>
+            <span class="font-mono text-xs text-slate-400">ARCHITECTURE</span>
+          </div>
+          <h3 class="font-display text-lg font-bold text-white mb-4">Gameplay &amp; Systems</h3>
+          <div class="space-y-3 mb-5">
+            <div>
+              <div class="flex justify-between font-mono text-xs mb-1">
+                <span class="text-slate-200">Player Controllers &amp; Physics</span>
+                <span class="text-emeraldTelemetry">94%</span>
+              </div>
+              <div class="h-1.5 bg-obsidian rounded-full overflow-hidden">
+                <div class="skill-fill h-full bg-emeraldTelemetry rounded-full" data-width="94%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between font-mono text-xs mb-1">
+                <span class="text-slate-200">Event-Driven &amp; AI State Machines</span>
+                <span class="text-cyanEngine">92%</span>
+              </div>
+              <div class="h-1.5 bg-obsidian rounded-full overflow-hidden">
+                <div class="skill-fill h-full bg-cyanEngine rounded-full" data-width="92%"></div>
+              </div>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <span class="px-2.5 py-1 rounded-md bg-obsidian border border-slate-800 font-mono text-xs text-slate-300">Player Movement &amp; Physics</span>
+            <span class="px-2.5 py-1 rounded-md bg-obsidian border border-slate-800 font-mono text-xs text-slate-300">Combat &amp; Interaction</span>
+            <span class="px-2.5 py-1 rounded-md bg-obsidian border border-slate-800 font-mono text-xs text-slate-300">AI &amp; Progression</span>
+            <span class="px-2.5 py-1 rounded-md bg-obsidian border border-slate-800 font-mono text-xs text-slate-300">Event-Driven Arch</span>
+            <span class="px-2.5 py-1 rounded-md bg-obsidian border border-slate-800 font-mono text-xs text-slate-300">Object Pooling</span>
+            <span class="px-2.5 py-1 rounded-md bg-obsidian border border-slate-800 font-mono text-xs text-slate-300">UI/UX Flows</span>
+          </div>
+        </div>
+
+        <!-- Skill Category 3 -->
+        <div class="hud-panel rounded-2xl p-6 reveal">
+          <div class="flex items-center justify-between mb-4">
+            <span class="font-mono text-xs px-2.5 py-1 rounded bg-amberWarn/15 text-amberWarn border border-amberWarn/30">03 // PROFILING &amp; NET</span>
+            <span class="font-mono text-xs text-slate-400">60 FPS TARGET</span>
+          </div>
+          <h3 class="font-display text-lg font-bold text-white mb-4">Optimization, Multiplayer &amp; Pipeline</h3>
+          <div class="space-y-3 mb-5">
+            <div>
+              <div class="flex justify-between font-mono text-xs mb-1">
+                <span class="text-slate-200">Frame Rate &amp; Memory Profiling</span>
+                <span class="text-amberWarn">91%</span>
+              </div>
+              <div class="h-1.5 bg-obsidian rounded-full overflow-hidden">
+                <div class="skill-fill h-full bg-amberWarn rounded-full" data-width="91%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between font-mono text-xs mb-1">
+                <span class="text-slate-200">Multiplayer &amp; LiveOps SDKs</span>
+                <span class="text-cyanEngine">84%</span>
+              </div>
+              <div class="h-1.5 bg-obsidian rounded-full overflow-hidden">
+                <div class="skill-fill h-full bg-cyanEngine rounded-full" data-width="84%"></div>
+              </div>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <span class="px-2.5 py-1 rounded-md bg-obsidian border border-slate-800 font-mono text-xs text-slate-300">Photon PUN</span>
+            <span class="px-2.5 py-1 rounded-md bg-obsidian border border-slate-800 font-mono text-xs text-slate-300">Unity Mirror</span>
+            <span class="px-2.5 py-1 rounded-md bg-obsidian border border-slate-800 font-mono text-xs text-slate-300">WebSockets</span>
+            <span class="px-2.5 py-1 rounded-md bg-obsidian border border-slate-800 font-mono text-xs text-slate-300">Firebase</span>
+            <span class="px-2.5 py-1 rounded-md bg-obsidian border border-slate-800 font-mono text-xs text-slate-300">LOD &amp; Texture Opt</span>
+            <span class="px-2.5 py-1 rounded-md bg-obsidian border border-slate-800 font-mono text-xs text-slate-300">Blender / Substance</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROFESSIONAL EXPERIENCE TIMELINE -->
+  <section id="experience" class="py-20 relative">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="mb-12 reveal">
+        <div class="font-mono text-xs text-cyanEngine uppercase tracking-widest mb-2">// CAREER_TELEMETRY</div>
+        <h2 class="font-display text-3xl sm:text-4xl font-bold text-white">Professional Experience</h2>
+      </div>
+
+      <div class="relative border-l-2 border-cyanEngine/30 ml-3 sm:ml-6 space-y-10">
+        <!-- Role 1 -->
+        <div class="relative pl-8 sm:pl-10 reveal">
+          <span class="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full bg-cyanEngine ring-4 ring-obsidian"></span>
+          <div class="hud-panel rounded-2xl p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+              <div>
+                <h3 class="font-display text-xl font-bold text-white">Gameplay Programmer / Unity Developer</h3>
+                <div class="text-cyanEngine font-medium text-sm sm:text-base">Vihaa Technologies LLP <span class="text-slate-500">•</span> <span class="text-slate-400">Ahmedabad, India</span></div>
+              </div>
+              <span class="inline-flex items-center px-3 py-1 rounded-full bg-emeraldTelemetry/15 border border-emeraldTelemetry/30 font-mono text-xs text-emeraldTelemetry w-fit">
+                Jun 2026 – Present
+              </span>
+            </div>
+            <ul class="space-y-2.5 text-slate-300 text-sm sm:text-base list-disc list-inside marker:text-cyanEngine">
+              <li>Architected and developed core gameplay systems, physics simulations, and responsive player controls from the ground up in Unity (C#) for commercial titles including a physics-based <span class="text-white font-medium">8 Ball Pool</span> game and a vehicle-dynamics <span class="text-white font-medium">Hill Climb</span> title.</li>
+              <li>Engineered terrain interaction, vehicle physics, and state-driven gameplay loops to ensure tight control feel and predictable collision behavior across devices.</li>
+              <li>Profiled and optimized runtime gameplay performance, resolving frame-time spikes and memory bottlenecks across the full development lifecycle.</li>
+              <li>Collaborated cross-functionally with designers and artists to iterate on game feel, UI responsiveness, and feature polish.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Role 2 -->
+        <div class="relative pl-8 sm:pl-10 reveal">
+          <span class="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full bg-surface border-2 border-cyanEngine ring-4 ring-obsidian"></span>
+          <div class="hud-panel rounded-2xl p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+              <div>
+                <h3 class="font-display text-xl font-bold text-white">Unity Game Developer</h3>
+                <div class="text-cyanEngine font-medium text-sm sm:text-base">Webmobril Technologies Pvt. Ltd. (WM Gaming Studioz) <span class="text-slate-500">•</span> <span class="text-slate-400">Indore, India</span></div>
+              </div>
+              <span class="inline-flex items-center px-3 py-1 rounded-full bg-surfaceLight border border-slate-700 font-mono text-xs text-slate-300 w-fit">
+                Apr 2025 – May 2026
+              </span>
+            </div>
+            <ul class="space-y-2.5 text-slate-300 text-sm sm:text-base list-disc list-inside marker:text-cyanEngine">
+              <li>Implemented and maintained core gameplay mechanics, progression logic, and interactive UI systems across multiple shipped mobile titles.</li>
+              <li>Diagnosed, debugged, and resolved <span class="text-white font-medium">50+ complex gameplay and production defects</span> under tight release schedules, driving a <span class="text-emeraldTelemetry font-medium">30% reduction in QA-reported issues</span> in live builds.</li>
+              <li>Refactored legacy gameplay scripts into modular, decoupled components, improving code maintainability and reducing runtime regressions.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Role 3 -->
+        <div class="relative pl-8 sm:pl-10 reveal">
+          <span class="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full bg-surface border-2 border-cyanEngine ring-4 ring-obsidian"></span>
+          <div class="hud-panel rounded-2xl p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+              <div>
+                <h3 class="font-display text-xl font-bold text-white">Game Developer / 3D Technical Artist</h3>
+                <div class="text-cyanEngine font-medium text-sm sm:text-base">Crecer Entertainment <span class="text-slate-500">•</span> <span class="text-slate-400">Indore, India</span></div>
+              </div>
+              <span class="inline-flex items-center px-3 py-1 rounded-full bg-surfaceLight border border-slate-700 font-mono text-xs text-slate-300 w-fit">
+                Jan 2024 – Jan 2025
+              </span>
+            </div>
+            <ul class="space-y-2.5 text-slate-300 text-sm sm:text-base list-disc list-inside marker:text-cyanEngine">
+              <li>Bridged gameplay engineering and 3D art pipelines, producing and optimizing <span class="text-white font-medium">50+ production-ready game assets</span> (characters, weapons, environments) to meet strict memory and draw-call budgets.</li>
+              <li>Resolved critical build and runtime stability issues caused by third-party SDK/plugin conflicts, streamlining deployment workflows.</li>
+              <li>Reduced mobile frame drops and crashes by optimizing mesh LODs, textures, and asset streaming pipelines.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Education Card -->
+      <div class="mt-12 pl-0 sm:pl-6 reveal">
+        <div class="hud-panel rounded-2xl p-6 border-l-4 border-l-emeraldTelemetry flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div class="font-mono text-xs text-emeraldTelemetry uppercase tracking-wider mb-1">Academic Background</div>
+            <h3 class="font-display text-lg sm:text-xl font-bold text-white">Bachelor of Technology (B.Tech) in Computer Science</h3>
+            <p class="text-slate-400 text-sm mt-0.5">RGPV College (under Bhopal University), Indore</p>
+          </div>
+          <span class="font-mono text-xs px-3 py-1.5 rounded-lg bg-obsidian border border-slate-800 text-slate-300 w-fit">
+            Jun 2020 – Jun 2024
+          </span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONTACT & FOOTER -->
+  <footer id="contact" class="py-16 bg-surface/60 border-t border-cyanEngine/15">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="hud-panel reticle-box rounded-3xl p-8 sm:p-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8">
+        <div>
+          <div class="font-mono text-xs text-cyanEngine uppercase tracking-widest mb-2">// INITIALIZE_CONNECTION</div>
+          <h2 class="font-display text-2xl sm:text-4xl font-bold text-white">Ready to Ship High-Framerate Gameplay?</h2>
+          <p class="mt-2 text-slate-400 max-w-xl text-sm sm:text-base">
+            Available for Gameplay Programmer roles (Unity C# / Unreal Engine C++). Reach out directly via email or phone, or inspect my repositories and playable builds.
+          </p>
+        </div>
+
+        <div class="flex flex-col sm:flex-row flex-wrap gap-3 w-full lg:w-auto">
+          <button onclick="copyText('vivekambiya804@gmail.com', 'Email Address')" class="px-5 py-3.5 rounded-xl bg-cyanEngine text-obsidian font-mono font-bold text-xs sm:text-sm hover:bg-cyan-300 transition-colors flex items-center justify-center gap-2 cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
+            vivekambiya804@gmail.com
+          </button>
+
+          <button onclick="copyText('+91-9754002692', 'Phone Number')" class="px-5 py-3.5 rounded-xl bg-obsidian border border-slate-700 hover:border-cyanEngine text-slate-200 font-mono text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 cursor-pointer">
+            <svg class="w-4 h-4 text-emeraldTelemetry" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+            +91-9754002692
+          </button>
+        </div>
+      </div>
+
+      <div class="mt-10 pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono text-slate-500">
+        <div>© 2026 VIVEK AMBIYA // GAMEPLAY PROGRAMMER PORTFOLIO</div>
+        <div class="flex items-center gap-4">
+          <button onclick="openCustomizerModal()" class="text-cyanEngine hover:underline cursor-pointer">Manage Videos &amp; Images</button>
+          <span>•</span>
+          <span>Ahmedabad / Indore, India</span>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ===================================================================== -->
+  <!-- FULL-SCREEN MEDIA LIGHTBOX MODAL (VIDEO PLAYER + SCREENSHOT GALLERY)  -->
+  <!-- ===================================================================== -->
+  <div id="mediaLightbox" class="fixed inset-0 z-50 hidden items-center justify-center bg-obsidian/90 backdrop-blur-lg p-3 sm:p-6">
+    <div class="hud-panel rounded-2xl max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-cyanEngine/40">
+      <!-- Modal Header -->
+      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between gap-4 bg-surface">
+        <div>
+          <div id="modalEngineTag" class="font-mono text-xs text-cyanEngine">UNREAL ENGINE • C++</div>
+          <h3 id="modalTitle" class="font-display text-lg sm:text-xl font-bold text-white">Project Title</h3>
+        </div>
+        <button onclick="closeLightbox()" class="p-2 rounded-lg bg-obsidian hover:bg-red-500/20 text-slate-300 hover:text-red-400 border border-slate-700 transition-colors cursor-pointer" aria-label="Close modal">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <!-- Media Mode Switcher Tabs -->
+      <div class="px-5 py-2.5 bg-obsidian/70 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <button id="tabVideoBtn" onclick="switchLightboxTab('video')" class="px-3.5 py-1.5 rounded-lg font-mono text-xs bg-cyanEngine text-obsidian font-semibold flex items-center gap-1.5 cursor-pointer">
+            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"></path></svg>
+            Gameplay Video
+          </button>
+          <button id="tabImagesBtn" onclick="switchLightboxTab('images')" class="px-3.5 py-1.5 rounded-lg font-mono text-xs bg-surface text-slate-300 border border-slate-700 hover:border-cyanEngine flex items-center gap-1.5 cursor-pointer">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+            Screenshots (<span id="modalImgCount">2</span>)
+          </button>
+        </div>
+
+        <button onclick="closeLightbox(); openCustomizerModal();" class="font-mono text-xs text-cyanEngine hover:underline cursor-pointer">
+          + Edit this project's video/images
+        </button>
+      </div>
+
+      <!-- Modal Body (Scrollable) -->
+      <div class="p-5 overflow-y-auto space-y-5">
+        <!-- VIDEO VIEW -->
+        <div id="lightboxVideoPane" class="space-y-3">
+          <div id="videoPlayerContainer" class="relative w-full aspect-video rounded-xl overflow-hidden bg-obsidian border border-slate-800 flex items-center justify-center">
+            <!-- Dynamically injected YouTube iframe, HTML5 <video>, or Interactive Engine Simulation Preview -->
+          </div>
+        </div>
+
+        <!-- SCREENSHOTS GALLERY VIEW -->
+        <div id="lightboxImagesPane" class="hidden space-y-4">
+          <div class="relative w-full aspect-video rounded-xl overflow-hidden bg-obsidian border border-slate-800">
+            <img id="activeScreenshotImg" src="" alt="Gameplay Screenshot" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/1280x720/111622/00F0FF?text=Gameplay+Screenshot+Slot'" />
+            <div id="screenshotCaption" class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-obsidian via-obsidian/80 to-transparent p-4 font-mono text-xs text-cyanEngine">
+              Capture 01 // Gameplay Telemetry
+            </div>
+          </div>
+          <!-- Thumbnails Strip -->
+          <div id="screenshotThumbnails" class="grid grid-cols-2 sm:grid-cols-4 gap-3"></div>
+        </div>
+
+        <!-- Technical Architecture Breakdown -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+          <div class="md:col-span-2 bg-obsidian/70 rounded-xl p-4 border border-slate-800">
+            <div class="font-mono text-xs text-cyanEngine uppercase mb-1.5">// System Architecture &amp; Implementation</div>
+            <p id="modalDescription" class="text-slate-300 text-sm leading-relaxed"></p>
+          </div>
+          <div class="bg-obsidian/70 rounded-xl p-4 border border-slate-800">
+            <div class="font-mono text-xs text-emeraldTelemetry uppercase mb-2">// Core Mechanics &amp; Tech</div>
+            <div id="modalTags" class="flex flex-wrap gap-1.5"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MEDIA & LINKS CUSTOMIZER DRAWER/MODAL (LIVE EDIT + HTML EXPORT)       -->
+  <!-- ===================================================================== -->
+  <div id="customizerModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-obsidian/90 backdrop-blur-lg p-3 sm:p-6">
+    <div class="hud-panel rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col overflow-hidden border border-cyanEngine/40">
+      <div class="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-surface">
+        <div>
+          <div class="font-mono text-xs text-cyanEngine">// PORTFOLIO_MEDIA_MANAGER</div>
+          <h3 class="font-display text-lg sm:text-xl font-bold text-white">Add Your Gameplay Videos, Screenshots &amp; Links</h3>
+        </div>
+        <button onclick="closeCustomizerModal()" class="p-2 rounded-lg bg-obsidian hover:bg-red-500/20 text-slate-300 hover:text-red-400 border border-slate-700 cursor-pointer">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <div class="p-5 overflow-y-auto space-y-6">
+        <div class="p-3.5 rounded-xl bg-cyanEngine/10 border border-cyanEngine/30 text-xs sm:text-sm text-slate-200">
+          Paste your <span class="text-cyanEngine font-semibold">YouTube links</span>, <span class="text-cyanEngine font-semibold">direct .MP4 gameplay videos</span>, or <span class="text-cyanEngine font-semibold">screenshot URLs</span> below. Changes update immediately in your browser and persist automatically!
+        </div>
+
+        <!-- Social Links -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block font-mono text-xs text-slate-400 mb-1">LinkedIn Profile URL</label>
+            <input id="inputLinkedin" type="url" placeholder="https://linkedin.com/in/your-profile" class="w-full px-3.5 py-2 rounded-lg bg-obsidian border border-slate-700 focus:border-cyanEngine outline-none text-sm text-white font-mono" />
+          </div>
+          <div>
+            <label class="block font-mono text-xs text-slate-400 mb-1">GitHub / Itch.io Portfolio URL</label>
+            <input id="inputGithub" type="url" placeholder="https://github.com/your-username" class="w-full px-3.5 py-2 rounded-lg bg-obsidian border border-slate-700 focus:border-cyanEngine outline-none text-sm text-white font-mono" />
+          </div>
+        </div>
+
+        <!-- Per-Project Media Inputs -->
+        <div id="customizerProjectList" class="space-y-4"></div>
+      </div>
+
+      <div class="px-5 py-4 border-t border-slate-800 bg-surface flex flex-wrap items-center justify-between gap-3">
+        <button onclick="resetCustomMedia()" class="px-4 py-2 rounded-lg bg-obsidian border border-slate-700 hover:border-red-400 text-slate-300 hover:text-red-300 font-mono text-xs cursor-pointer">
+          Reset Defaults
+        </button>
+        <div class="flex flex-wrap items-center gap-2.5">
+          <button onclick="downloadConfiguredHTML()" class="px-4 py-2 rounded-lg bg-emeraldTelemetry/20 border border-emeraldTelemetry text-emeraldTelemetry hover:bg-emeraldTelemetry hover:text-obsidian font-mono text-xs font-semibold transition-colors cursor-pointer">
+            Download Updated .HTML
+          </button>
+          <button onclick="saveCustomMedia()" class="px-5 py-2 rounded-lg bg-cyanEngine text-obsidian font-mono text-xs font-bold hover:bg-cyan-300 transition-colors cursor-pointer">
+            Save &amp; Preview Live
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- JAVASCRIPT: PHYSICS CANVAS, PROJECT ENGINE, LIGHTBOX & CUSTOMIZER     -->
+  <!-- ===================================================================== -->
+  <script>
+    // -----------------------------------------------------------------------
+    // 1. DEFAULT PROJECT DATA (FROM VIVEK AMBIYA'S RESUME)
+    // -----------------------------------------------------------------------
+    const DEFAULT_SOCIALS = {
+      linkedin: "https://www.linkedin.com",
+      github: "https://github.com"
+    };
+
+    const DEFAULT_PROJECTS = [
+      {
+        id: "ue-combat",
+        title: "Third-Person Combat & Locomotion Prototype",
+        engine: "Unreal Engine • C++ & Blueprints",
+        category: "unreal",
+        accent: "purple",
+        status: "PROTOTYPE REEL",
+        metric: "Combo State Machine + AI BT",
+        summary: "Responsive third-person character controller featuring directional movement, dash/dodge mechanics, melee combo state machines, and enemy AI behavior trees.",
+        architecture: "Architected in Unreal Engine combining C++ base character movement components with Blueprint animation montages. Implemented root-motion dash/dodge i-frames, buffered melee combo state transitions, and Blackboard-driven Enemy AI Behavior Trees for dynamic combat spacing.",
+        tags: ["Unreal C++", "Blueprints", "Behavior Trees", "Combo State Machine", "Root Motion"],
+        videoUrl: "", // Paste YouTube URL or .mp4 URL here
+        screenshots: [
+          "https://placehold.co/1280x720/111622/A855F7?text=Unreal+C%2B%2B+Third-Person+Combat+%26+Combo+State+Machine",
+          "https://placehold.co/1280x720/090B10/00F0FF?text=Enemy+AI+Behavior+Tree+%26+Hitbox+Telemetry"
+        ]
+      },
+      {
+        id: "ue-stealth",
+        title: "Tactical Stealth & Interaction Short Game",
+        engine: "Unreal Engine • C++ & Blueprints",
+        category: "unreal",
+        accent: "purple",
+        status: "PROTOTYPE REEL",
+        metric: "AI Line-of-Sight Perception",
+        summary: "Stealth-action game prototype implementing AI line-of-sight perception, patrol/alert states, interactive environment triggers, and dynamic camera transitions.",
+        architecture: "Built custom AI sight-cone perception checks using dot-product angle thresholds and multi-raycast occlusion queries in C++. Connected patrol/investigate/alert state transitions to diegetic world triggers and smooth camera blend volumes.",
+        tags: ["Unreal Engine", "AI Perception", "Raycast Occlusion", "State Machines", "Dynamic Cameras"],
+        videoUrl: "",
+        screenshots: [
+          "https://placehold.co/1280x720/111622/A855F7?text=Tactical+Stealth+AI+Line-of-Sight+Cone+Debug",
+          "https://placehold.co/1280x720/090B10/10B981?text=Interactive+Environment+Triggers+%26+Alert+States"
+        ]
+      },
+      {
+        id: "unity-pool-hillclimb",
+        title: "8 Ball Pool & Vehicle-Dynamics Hill Climb",
+        engine: "Unity • C# Physics",
+        category: "physics",
+        accent: "cyan",
+        status: "COMMERCIAL TITLES",
+        metric: "Custom Rigidbody & Terrain Physics",
+        summary: "Core gameplay systems, rigidbody physics simulations, terrain interaction, vehicle dynamics, and state-driven gameplay loops built from the ground up.",
+        architecture: "Engineered deterministic cue-ball impulse mechanics, cushion restitution, and trajectory prediction lines for 8 Ball Pool alongside WheelJoint/suspension torque curves and procedural terrain friction handling for Hill Climb.",
+        tags: ["Unity C#", "Rigidbody Physics", "Trajectory Prediction", "Vehicle Dynamics", "State Loops"],
+        videoUrl: "",
+        screenshots: [
+          "https://placehold.co/1280x720/111622/00F0FF?text=8+Ball+Pool+Trajectory+Prediction+%26+Impulse+Physics",
+          "https://placehold.co/1280x720/090B10/F59E0B?text=Hill+Climb+Suspension+%26+Terrain+Dynamics"
+        ]
+      },
+      {
+        id: "unity-cricket",
+        title: "Cricket — Fielding AI & Progression",
+        engine: "Unity • C#",
+        category: "unity",
+        accent: "cyan",
+        status: "SHIPPED TITLE",
+        metric: "Ball Trajectory Prediction AI",
+        summary: "Engineered complete player fielding AI and control system handling ball trajectory prediction, player positioning, and catch/throw mechanics.",
+        architecture: "Computed real-time parabolic ball landing coordinates with wind/bounce damping to dispatch optimal fielder intercept vectors. Extended the quest/progression backend and overhauled multi-screen UI flows to boost player retention.",
+        tags: ["Unity C#", "Fielding AI", "Ball Trajectory Math", "Quest Systems", "UI/UX Flows"],
+        videoUrl: "",
+        screenshots: [
+          "https://placehold.co/1280x720/111622/00F0FF?text=Cricket+Ball+Trajectory+Prediction+%26+Fielder+AI",
+          "https://placehold.co/1280x720/090B10/10B981?text=Quest+Architecture+%26+Multi-Screen+UI+Overhaul"
+        ]
+      },
+      {
+        id: "unity-savannah",
+        title: "Savannah Slot — Event-Driven Core",
+        engine: "Unity • C#",
+        category: "unity",
+        accent: "emerald",
+        status: "SHIPPED TITLE",
+        metric: "+70% System Stability",
+        summary: "Core gameplay loop and payout-line evaluation logic built from scratch using a custom event-driven architecture that improved system stability by 70%.",
+        architecture: "Decoupled reel spin states, payout-line matrix evaluation, UI animations, and audio triggers via a strongly-typed C# Event Bus. Integrated user authentication, social leaderboards, and asynchronous scene loading to eliminate transition stalls.",
+        tags: ["Event-Driven Arch", "Unity C#", "Async Scene Loading", "Auth & Social", "Zero Stall"],
+        videoUrl: "",
+        screenshots: [
+          "https://placehold.co/1280x720/111622/10B981?text=Savannah+Slot+Event-Driven+Core+%26+Payout+Matrix",
+          "https://placehold.co/1280x720/090B10/00F0FF?text=Async+Scene+Streaming+%26+Social+Integration"
+        ]
+      },
+      {
+        id: "unity-optimization",
+        title: "Car Parking & Hill Climb Optimization",
+        engine: "Unity • C# Profiling",
+        category: "physics",
+        accent: "emerald",
+        status: "PERFORMANCE PASS",
+        metric: "-50% FPS Drops | -30% Lag",
+        summary: "Implemented object pooling and environment optimization techniques, cutting runtime lag by 30% and reducing FPS drops by 50% on mid-tier hardware.",
+        architecture: "Eliminated GC allocation spikes during gameplay by pooling traffic/obstacle prefabs, batching static environment meshes, configuring LOD groups, and compressing mobile texture atlases.",
+        tags: ["Object Pooling", "Frame Profiling", "GC Reduction", "LOD Optimization", "Mobile Perf"],
+        videoUrl: "",
+        screenshots: [
+          "https://placehold.co/1280x720/111622/10B981?text=Unity+Profiler+Frame-Time+Optimization+(-50%25+Drops)",
+          "https://placehold.co/1280x720/090B10/F59E0B?text=Object+Pooling+%26+Draw-Call+Batching+Pipeline"
+        ]
+      },
+      {
+        id: "unity-fruitcrush",
+        title: "Fruit Crush — LiveOps & State Refactor",
+        engine: "Unity • C#",
+        category: "unity",
+        accent: "cyan",
+        status: "SHIPPED TITLE",
+        metric: "-50% Gameplay Bugs",
+        summary: "Refactored core gameplay state logic and fixed In-App Purchase (IAP) and rewarded-ad hooks, reducing overall gameplay bugs by 50%.",
+        architecture: "Replaced tangled board-matching flags with a deterministic match-3 state machine (Idle -> Swap -> Match -> Cascade -> Refill) and hardened IAP receipt callbacks and rewarded-ad placement hooks.",
+        tags: ["State Machine Refactor", "IAP & Rewarded Ads", "Match-3 Logic", "LiveOps Stability"],
+        videoUrl: "",
+        screenshots: [
+          "https://placehold.co/1280x720/111622/00F0FF?text=Fruit+Crush+Deterministic+Board+State+Machine",
+          "https://placehold.co/1280x720/090B10/10B981?text=IAP+%26+Rewarded+Ad+Callback+Verification"
+        ]
+      }
+    ];
+
+    // Load saved state from localStorage if available
+    let projectsData = JSON.parse(localStorage.getItem("vivek_portfolio_projects")) || JSON.parse(JSON.stringify(DEFAULT_PROJECTS));
+    let socialsData = JSON.parse(localStorage.getItem("vivek_portfolio_socials")) || { ...DEFAULT_SOCIALS };
+    let currentFilter = "all";
+    let activeModalProject = null;
+
+    // -----------------------------------------------------------------------
+    // 2. RENDER PROJECT CARDS (WITH VIDEO & SCREENSHOT TRIGGERS)
+    // -----------------------------------------------------------------------
+    function renderProjects() {
+      const grid = document.getElementById("projectsGrid");
+      grid.innerHTML = "";
+
+      const filtered = projectsData.filter(p => {
+        if (currentFilter === "all") return true;
+        if (currentFilter === "unity") return p.category === "unity" || p.category === "physics";
+        return p.category === currentFilter;
+      });
+
+      filtered.forEach((project, idx) => {
+        const badgeColor =
+          project.accent === "purple"
+            ? "text-purpleUnreal bg-purpleUnreal/15 border-purpleUnreal/30"
+            : project.accent === "emerald"
+            ? "text-emeraldTelemetry bg-emeraldTelemetry/15 border-emeraldTelemetry/30"
+            : "text-cyanEngine bg-cyanEngine/15 border-cyanEngine/30";
+
+        const hasCustomVideo = Boolean(project.videoUrl && project.videoUrl.trim() !== "");
+        const thumbImg = project.screenshots && project.screenshots[0]
+          ? project.screenshots[0]
+          : `https://placehold.co/800x450/111622/00F0FF?text=${encodeURIComponent(project.title)}`;
+
+        const card = document.createElement("article");
+        card.className = "hud-panel reticle-box rounded-2xl overflow-hidden flex flex-col justify-between group reveal visible";
+        card.style.transitionDelay = `${idx * 45}ms`;
+
+        card.innerHTML = `
+          <div>
+            <!-- Media Preview Thumbnail Container -->
+            <div class="relative aspect-video bg-obsidian overflow-hidden border-b border-slate-800/90 cursor-pointer" onclick="openLightbox('${project.id}', 'video')">
+              <img src="${thumbImg}" alt="${project.title}" class="w-full h-full object-cover opacity-85 group-hover:scale-105 group-hover:opacity-100 transition-all duration-500" onerror="this.src='https://placehold.co/800x450/111622/00F0FF?text=Gameplay+Preview'" />
+              <div class="absolute inset-0 scanlines pointer-events-none"></div>
+              <div class="absolute inset-0 bg-gradient-to-t from-obsidian via-obsidian/20 to-transparent"></div>
+
+              <!-- Top Badges -->
+              <div class="absolute top-3 left-3 right-3 flex items-center justify-between gap-2">
+                <span class="px-2.5 py-1 rounded-md font-mono text-[11px] font-semibold border backdrop-blur-md ${badgeColor}">
+                  ${project.engine}
+                </span>
+                <span class="px-2 py-0.5 rounded bg-obsidian/85 border border-slate-700 font-mono text-[10px] text-slate-300">
+                  ${hasCustomVideo ? "● VIDEO READY" : "▶ DEMO + GALLERY"}
+                </span>
+              </div>
+
+              <!-- Center Play Button Overlay -->
+              <div class="absolute inset-0 flex items-center justify-center">
+                <div class="w-12 h-12 rounded-full bg-cyanEngine/90 text-obsidian flex items-center justify-center shadow-lg shadow-cyanEngine/30 group-hover:scale-110 transition-transform">
+                  <svg class="w-5 h-5 ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"></path></svg>
+                </div>
+              </div>
+
+              <!-- Bottom Metric Strip -->
+              <div class="absolute bottom-2.5 left-3 right-3 flex items-center justify-between font-mono text-[11px]">
+                <span class="text-emeraldTelemetry font-semibold">${project.metric}</span>
+                <span class="text-slate-400">${project.screenshots.length} Shots</span>
+              </div>
+            </div>
+
+            <!-- Card Body -->
+            <div class="p-5">
+              <div class="font-mono text-[11px] text-slate-400 mb-1">${project.status}</div>
+              <h3 class="font-display text-lg font-bold text-white group-hover:text-cyanEngine transition-colors">
+                ${project.title}
+              </h3>
+              <p class="mt-2 text-slate-400 text-sm leading-relaxed">
+                ${project.summary}
+              </p>
+            </div>
+          </div>
+
+          <!-- Card Footer Actions -->
+          <div class="px-5 pb-5 pt-2 space-y-4">
+            <div class="flex flex-wrap gap-1.5">
+              ${project.tags.slice(0, 4).map(t => `<span class="px-2 py-0.5 rounded bg-obsidian border border-slate-800 font-mono text-[11px] text-slate-300">${t}</span>`).join("")}
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <button onclick="openLightbox('${project.id}', 'video')" class="px-3 py-2 rounded-lg bg-cyanEngine/15 hover:bg-cyanEngine text-cyanEngine hover:text-obsidian border border-cyanEngine/35 font-mono text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"></path></svg>
+                Watch Reel
+              </button>
+              <button onclick="openLightbox('${project.id}', 'images')" class="px-3 py-2 rounded-lg bg-obsidian hover:bg-surfaceLight text-slate-200 border border-slate-700 hover:border-cyanEngine font-mono text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                <svg class="w-3.5 h-3.5 text-cyanEngine" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                Screenshots
+              </button>
+            </div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function filterProjects(category) {
+      currentFilter = category;
+      document.querySelectorAll(".filter-btn").forEach(btn => {
+        if (btn.dataset.filter === category) {
+          btn.className = "filter-btn active px-3.5 py-2 rounded-lg font-mono text-xs bg-cyanEngine text-obsidian font-semibold transition-all cursor-pointer";
+        } else {
+          btn.className = "filter-btn px-3.5 py-2 rounded-lg font-mono text-xs bg-surface text-slate-300 border border-slate-700 hover:border-cyanEngine transition-all cursor-pointer";
+        }
+      });
+      renderProjects();
+    }
+
+    // -----------------------------------------------------------------------
+    // 3. MEDIA LIGHTBOX MODAL (YOUTUBE / MP4 / INTERACTIVE SANDBOX + GALLERY)
+    // -----------------------------------------------------------------------
+    function parseYouTubeEmbed(url) {
+      if (!url) return null;
+      const regExp = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+      const match = url.match(regExp);
+      return match ? `https://www.youtube.com/embed/${match[1]}?autoplay=1&rel=0` : null;
+    }
+
+    function openLightbox(projectId, initialTab = "video") {
+      const project = projectsData.find(p => p.id === projectId);
+      if (!project) return;
+      activeModalProject = project;
+
+      document.getElementById("modalEngineTag").textContent = `${project.engine.toUpperCase()} // ${project.status}`;
+      document.getElementById("modalTitle").textContent = project.title;
+      document.getElementById("modalDescription").textContent = project.architecture;
+      document.getElementById("modalImgCount").textContent = project.screenshots.length;
+
+      // Render tags
+      const tagsContainer = document.getElementById("modalTags");
+      tagsContainer.innerHTML = project.tags
+        .map(t => `<span class="px-2.5 py-1 rounded bg-surface border border-slate-700 font-mono text-xs text-cyanEngine">${t}</span>`)
+        .join("");
+
+      // Setup Video Player
+      const videoContainer = document.getElementById("videoPlayerContainer");
+      const ytEmbed = parseYouTubeEmbed(project.videoUrl);
+
+      if (ytEmbed) {
+        videoContainer.innerHTML = `<iframe class="w-full h-full" src="${ytEmbed}" title="${project.title}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+      } else if (project.videoUrl && project.videoUrl.trim() !== "") {
+        videoContainer.innerHTML = `<video class="w-full h-full object-contain bg-black" src="${project.videoUrl}" controls autoplay playsinline></video>`;
+      } else {
+        // Built-in interactive engine telemetry placeholder with 1-click attach button
+        videoContainer.innerHTML = `
+          <div class="relative w-full h-full flex flex-col items-center justify-center p-6 text-center bg-gradient-to-br from-surface via-obsidian to-surface">
+            <div class="w-16 h-16 rounded-2xl bg-cyanEngine/15 border border-cyanEngine/40 flex items-center justify-center text-cyanEngine mb-4">
+              <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+            </div>
+            <div class="font-mono text-xs text-cyanEngine uppercase tracking-wider mb-1">Gameplay Video Slot Ready</div>
+            <h4 class="font-display text-lg sm:text-xl font-bold text-white max-w-md">${project.title}</h4>
+            <p class="mt-2 text-slate-400 text-xs sm:text-sm max-w-md">
+              No external YouTube or .MP4 link is attached yet. Click below to paste your gameplay capture URL and preview it immediately.
+            </p>
+            <div class="mt-5 flex flex-wrap items-center justify-center gap-3">
+              <button onclick="closeLightbox(); openCustomizerModal();" class="px-4 py-2 rounded-lg bg-cyanEngine text-obsidian font-mono text-xs font-bold hover:bg-cyan-300 transition-colors cursor-pointer">
+                + Attach YouTube / MP4 Link
+              </button>
+              <button onclick="switchLightboxTab('images')" class="px-4 py-2 rounded-lg bg-surface border border-slate-700 hover:border-cyanEngine text-slate-200 font-mono text-xs cursor-pointer">
+                View Screenshots (${project.screenshots.length})
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      // Setup Screenshots Gallery
+      const thumbs = document.getElementById("screenshotThumbnails");
+      thumbs.innerHTML = "";
+      project.screenshots.forEach((src, i) => {
+        const btn = document.createElement("button");
+        btn.className = "relative aspect-video rounded-lg overflow-hidden border-2 border-slate-700 hover:border-cyanEngine focus:border-cyanEngine transition-all cursor-pointer";
+        btn.innerHTML = `<img src="${src}" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/400x225/111622/00F0FF?text=Shot+0${i + 1}'" />`;
+        btn.onclick = () => selectScreenshot(i);
+        thumbs.appendChild(btn);
+      });
+      selectScreenshot(0);
+
+      switchLightboxTab(initialTab);
+
+      const modal = document.getElementById("mediaLightbox");
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+      document.body.style.overflow = "hidden";
+    }
+
+    function selectScreenshot(index) {
+      if (!activeModalProject || !activeModalProject.screenshots[index]) return;
+      document.getElementById("activeScreenshotImg").src = activeModalProject.screenshots[index];
+      document.getElementById("screenshotCaption").textContent = `Capture 0${index + 1} // ${activeModalProject.title} — ${activeModalProject.metric}`;
+    }
+
+    function switchLightboxTab(tab) {
+      const videoPane = document.getElementById("lightboxVideoPane");
+      const imagesPane = document.getElementById("lightboxImagesPane");
+      const videoBtn = document.getElementById("tabVideoBtn");
+      const imagesBtn = document.getElementById("tabImagesBtn");
+
+      if (tab === "video") {
+        videoPane.classList.remove("hidden");
+        imagesPane.classList.add("hidden");
+        videoBtn.className = "px-3.5 py-1.5 rounded-lg font-mono text-xs bg-cyanEngine text-obsidian font-semibold flex items-center gap-1.5 cursor-pointer";
+        imagesBtn.className = "px-3.5 py-1.5 rounded-lg font-mono text-xs bg-surface text-slate-300 border border-slate-700 hover:border-cyanEngine flex items-center gap-1.5 cursor-pointer";
+      } else {
+        videoPane.classList.add("hidden");
+        imagesPane.classList.remove("hidden");
+        imagesBtn.className = "px-3.5 py-1.5 rounded-lg font-mono text-xs bg-cyanEngine text-obsidian font-semibold flex items-center gap-1.5 cursor-pointer";
+        videoBtn.className = "px-3.5 py-1.5 rounded-lg font-mono text-xs bg-surface text-slate-300 border border-slate-700 hover:border-cyanEngine flex items-center gap-1.5 cursor-pointer";
+      }
+    }
+
+    function closeLightbox() {
+      const modal = document.getElementById("mediaLightbox");
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+      document.getElementById("videoPlayerContainer").innerHTML = "";
+      document.body.style.overflow = "";
+    }
+
+    // -----------------------------------------------------------------------
+    // 4. MEDIA & LINKS CUSTOMIZER MODAL
+    // -----------------------------------------------------------------------
+    function openCustomizerModal() {
+      document.getElementById("inputLinkedin").value = socialsData.linkedin || "";
+      document.getElementById("inputGithub").value = socialsData.github || "";
+
+      const list = document.getElementById("customizerProjectList");
+      list.innerHTML = "";
+
+      projectsData.forEach((p, idx) => {
+        const block = document.createElement("div");
+        block.className = "p-4 rounded-xl bg-obsidian/80 border border-slate-800 space-y-3";
+        block.innerHTML = `
+          <div class="flex items-center justify-between">
+            <span class="font-display font-bold text-white text-sm">${idx + 1}. ${p.title}</span>
+            <span class="font-mono text-[11px] text-cyanEngine">${p.engine}</span>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label class="block font-mono text-[11px] text-slate-400 mb-1">Gameplay Video (YouTube / .mp4)</label>
+              <input data-proj-video="${p.id}" type="url" value="${p.videoUrl || ""}" placeholder="https://youtu.be/... or .mp4" class="w-full px-3 py-1.5 rounded-lg bg-surface border border-slate-700 focus:border-cyanEngine outline-none text-xs text-white font-mono" />
+            </div>
+            <div>
+              <label class="block font-mono text-[11px] text-slate-400 mb-1">Screenshot 1 URL</label>
+              <input data-proj-img1="${p.id}" type="url" value="${p.screenshots[0] || ""}" placeholder="https://.../screenshot1.png" class="w-full px-3 py-1.5 rounded-lg bg-surface border border-slate-700 focus:border-cyanEngine outline-none text-xs text-white font-mono" />
+            </div>
+            <div>
+              <label class="block font-mono text-[11px] text-slate-400 mb-1">Screenshot 2 URL</label>
+              <input data-proj-img2="${p.id}" type="url" value="${p.screenshots[1] || ""}" placeholder="https://.../screenshot2.png" class="w-full px-3 py-1.5 rounded-lg bg-surface border border-slate-700 focus:border-cyanEngine outline-none text-xs text-white font-mono" />
+            </div>
+          </div>
+        `;
+        list.appendChild(block);
+      });
+
+      const modal = document.getElementById("customizerModal");
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+      document.body.style.overflow = "hidden";
+    }
+
+    function closeCustomizerModal() {
+      const modal = document.getElementById("customizerModal");
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+      document.body.style.overflow = "";
+    }
+
+    function saveCustomMedia() {
+      socialsData.linkedin = document.getElementById("inputLinkedin").value.trim() || DEFAULT_SOCIALS.linkedin;
+      socialsData.github = document.getElementById("inputGithub").value.trim() || DEFAULT_SOCIALS.github;
+
+      projectsData.forEach(p => {
+        const vInput = document.querySelector(`[data-proj-video="${p.id}"]`);
+        const i1Input = document.querySelector(`[data-proj-img1="${p.id}"]`);
+        const i2Input = document.querySelector(`[data-proj-img2="${p.id}"]`);
+        if (vInput) p.videoUrl = vInput.value.trim();
+        if (i1Input && i1Input.value.trim()) p.screenshots[0] = i1Input.value.trim();
+        if (i2Input && i2Input.value.trim()) p.screenshots[1] = i2Input.value.trim();
+      });
+
+      localStorage.setItem("vivek_portfolio_projects", JSON.stringify(projectsData));
+      localStorage.setItem("vivek_portfolio_socials", JSON.stringify(socialsData));
+
+      applySocialLinks();
+      renderProjects();
+      closeCustomizerModal();
+      showToast("Media links & gallery updated live!");
+    }
+
+    function resetCustomMedia() {
+      localStorage.removeItem("vivek_portfolio_projects");
+      localStorage.removeItem("vivek_portfolio_socials");
+      projectsData = JSON.parse(JSON.stringify(DEFAULT_PROJECTS));
+      socialsData = { ...DEFAULT_SOCIALS };
+      applySocialLinks();
+      renderProjects();
+      closeCustomizerModal();
+      showToast("Reset to default portfolio media.");
+    }
+
+    function downloadConfiguredHTML() {
+      saveCustomMedia();
+      // Serialize current HTML with baked-in user media data
+      let htmlContent = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;
+      htmlContent = htmlContent.replace(
+        /const DEFAULT_PROJECTS = \[[\s\S]*?\];/,
+        `const DEFAULT_PROJECTS = ${JSON.stringify(projectsData, null, 2)};`
+      );
+      htmlContent = htmlContent.replace(
+        /const DEFAULT_SOCIALS = \{[\s\S]*?\};/,
+        `const DEFAULT_SOCIALS = ${JSON.stringify(socialsData, null, 2)};`
+      );
+
+      const blob = new Blob([htmlContent], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "Vivek_Ambiya_Gameplay_Portfolio.html";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast("Exported standalone HTML with your videos & images!");
+    }
+
+    function applySocialLinks() {
+      const li = document.getElementById("heroLinkedinLink");
+      const gh = document.getElementById("heroGithubLink");
+      if (li) li.href = socialsData.linkedin;
+      if (gh) gh.href = socialsData.github;
+    }
+
+    // -----------------------------------------------------------------------
+    // 5. CLIPBOARD & TOAST NOTIFICATIONS (NO ALERT())
+    // -----------------------------------------------------------------------
+    function copyText(text, label) {
+      const temp = document.createElement("textarea");
+      temp.value = text;
+      document.body.appendChild(temp);
+      temp.select();
+      try {
+        document.execCommand("copy");
+        showToast(`${label} copied: ${text}`);
+      } catch (e) {
+        showToast(`Contact: ${text}`);
+      }
+      document.body.removeChild(temp);
+    }
+
+    function showToast(message) {
+      const container = document.getElementById("toastContainer");
+      const toast = document.createElement("div");
+      toast.className = "hud-panel px-4 py-2.5 rounded-xl border border-cyanEngine/50 font-mono text-xs text-white flex items-center gap-2 shadow-xl pointer-events-auto transition-all";
+      toast.innerHTML = `<span class="w-2 h-2 rounded-full bg-cyanEngine"></span><span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateY(8px)";
+        setTimeout(() => toast.remove(), 300);
+      }, 2800);
+    }
+
+    // -----------------------------------------------------------------------
+    // 6. INTERACTIVE 2D GAMEPLAY PHYSICS & AI TELEMETRY CANVAS
+    // -----------------------------------------------------------------------
+    let simRunning = true;
+    function toggleSimulation() {
+      simRunning = !simRunning;
+      document.getElementById("toggleSimBtn").textContent = simRunning ? "Pause" : "Resume";
+    }
+
+    function initTelemetryCanvas() {
+      const canvas = document.getElementById("telemetryCanvas");
+      const container = document.getElementById("canvasContainer");
+      const ctx = canvas.getContext("2d");
+
+      let width = (canvas.width = container.clientWidth);
+      let height = (canvas.height = container.clientHeight);
+
+      window.addEventListener("resize", () => {
+        width = canvas.width = container.clientWidth;
+        height = canvas.height = container.clientHeight;
+      });
+
+      const mouse = { x: width * 0.72, y: height * 0.45, active: false };
+      const impulses = [];
+
+      // Rigidbodies representing pool/cricket ball trajectory & collision nodes
+      const bodies = Array.from({ length: 18 }, (_, i) => ({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 2.4,
+        vy: (Math.random() - 0.5) * 2.4,
+        r: i % 5 === 0 ? 6 : 3.5,
+        color: i % 4 === 0 ? "#10B981" : i % 3 === 0 ? "#A855F7" : "#00F0FF",
+        trail: []
+      }));
+
+      // AI Perception Agent (Stealth / Fielding AI Cone)
+      const aiAgent = {
+        x: width * 0.75,
+        y: height * 0.42,
+        angle: Math.PI,
+        fov: 0.58,
+        range: 210
+      };
+
+      window.addEventListener("mousemove", e => {
+        const rect = canvas.getBoundingClientRect();
+        mouse.x = e.clientX - rect.left;
+        mouse.y = e.clientY - rect.top;
+        mouse.active = true;
+      });
+
+      canvas.addEventListener("click", e => {
+        const rect = canvas.getBoundingClientRect();
+        const cx = e.clientX - rect.left;
+        const cy = e.clientY - rect.top;
+        impulses.push({ x: cx, y: cy, r: 8, alpha: 1 });
+
+        // Apply radial physics impulse to nearby rigidbodies
+        bodies.forEach(b => {
+          const dx = b.x - cx;
+          const dy = b.y - cy;
+          const dist = Math.hypot(dx, dy) || 1;
+          if (dist < 260) {
+            const force = (1 - dist / 260) * 7.5;
+            b.vx += (dx / dist) * force;
+            b.vy += (dy / dist) * force;
+          }
+        });
+      });
+
+      let lastTime = performance.now();
+      let frameCount = 0;
+      let fpsTimer = 0;
+
+      function animate(now) {
+        requestAnimationFrame(animate);
+        const dt = now - lastTime;
+        lastTime = now;
+
+        fpsTimer += dt;
+        frameCount++;
+        if (fpsTimer >= 500) {
+          const fps = Math.min(60, Math.round((frameCount * 1000) / fpsTimer));
+          document.getElementById("fpsCounter").textContent = `${fps} FPS`;
+          document.getElementById("frameTimeCounter").textContent = `${(1000 / (fps || 60)).toFixed(1)} ms`;
+          frameCount = 0;
+          fpsTimer = 0;
+        }
+
+        if (!simRunning) return;
+
+        ctx.clearRect(0, 0, width, height);
+
+        // Smoothly orient AI Perception Cone toward mouse
+        aiAgent.x = width * 0.76;
+        aiAgent.y = height * 0.44;
+        const targetAngle = Math.atan2(mouse.y - aiAgent.y, mouse.x - aiAgent.x);
+        aiAgent.angle += (targetAngle - aiAgent.angle) * 0.06;
+
+        // Draw AI Line-of-Sight Vision Cone
+        const coneGrad = ctx.createRadialGradient(aiAgent.x, aiAgent.y, 10, aiAgent.x, aiAgent.y, aiAgent.range);
+        coneGrad.addColorStop(0, "rgba(0, 240, 255, 0.16)");
+        coneGrad.addColorStop(1, "rgba(0, 240, 255, 0.0)");
+
+        ctx.beginPath();
+        ctx.moveTo(aiAgent.x, aiAgent.y);
+        ctx.arc(aiAgent.x, aiAgent.y, aiAgent.range, aiAgent.angle - aiAgent.fov, aiAgent.angle + aiAgent.fov);
+        ctx.closePath();
+        ctx.fillStyle = coneGrad;
+        ctx.fill();
+        ctx.strokeStyle = "rgba(0, 240, 255, 0.25)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // AI Node Core
+        ctx.beginPath();
+        ctx.arc(aiAgent.x, aiAgent.y, 5, 0, Math.PI * 2);
+        ctx.fillStyle = "#00F0FF";
+        ctx.fill();
+
+        // Update & Draw Physics Impulse Rings
+        for (let i = impulses.length - 1; i >= 0; i--) {
+          const imp = impulses[i];
+          imp.r += 6;
+          imp.alpha -= 0.025;
+          if (imp.alpha <= 0) {
+            impulses.splice(i, 1);
+            continue;
+          }
+          ctx.beginPath();
+          ctx.arc(imp.x, imp.y, imp.r, 0, Math.PI * 2);
+          ctx.strokeStyle = `rgba(0, 240, 255, ${imp.alpha})`;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+
+        // Update & Draw Rigidbodies + Predicted Trajectory Vectors
+        bodies.forEach((b, i) => {
+          b.x += b.vx;
+          b.y += b.vy;
+
+          // Damping back to cruise speed
+          b.vx *= 0.992;
+          b.vy *= 0.992;
+          if (Math.hypot(b.vx, b.vy) < 0.6) {
+            b.vx += (Math.random() - 0.5) * 0.15;
+            b.vy += (Math.random() - 0.5) * 0.15;
+          }
+
+          // Elastic boundary bounce
+          if (b.x < b.r) { b.x = b.r; b.vx *= -1; }
+          if (b.x > width - b.r) { b.x = width - b.r; b.vx *= -1; }
+          if (b.y < b.r) { b.y = b.r; b.vy *= -1; }
+          if (b.y > height - b.r) { b.y = height - b.r; b.vy *= -1; }
+
+          // Store short trajectory trail
+          b.trail.push({ x: b.x, y: b.y });
+          if (b.trail.length > 14) b.trail.shift();
+
+          // Draw trail
+          if (b.trail.length > 1) {
+            ctx.beginPath();
+            ctx.moveTo(b.trail[0].x, b.trail[0].y);
+            for (let t = 1; t < b.trail.length; t++) {
+              ctx.lineTo(b.trail[t].x, b.trail[t].y);
+            }
+            ctx.strokeStyle = "rgba(0, 240, 255, 0.14)";
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+
+          // Draw forward velocity prediction ray
+          ctx.beginPath();
+          ctx.moveTo(b.x, b.y);
+          ctx.lineTo(b.x + b.vx * 14, b.y + b.vy * 14);
+          ctx.strokeStyle = "rgba(16, 185, 129, 0.38)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          // Draw rigidbody node
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+          ctx.fillStyle = b.color;
+          ctx.fill();
+
+          // Spatial proximity links (Broadphase collision grid visualization)
+          for (let j = i + 1; j < bodies.length; j++) {
+            const b2 = bodies[j];
+            const dist = Math.hypot(b.x - b2.x, b.y - b2.y);
+            if (dist < 135) {
+              ctx.beginPath();
+              ctx.moveTo(b.x, b.y);
+              ctx.lineTo(b2.x, b2.y);
+              ctx.strokeStyle = `rgba(0, 240, 255, ${(1 - dist / 135) * 0.18})`;
+              ctx.lineWidth = 1;
+              ctx.stroke();
+            }
+          }
+        });
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    // -----------------------------------------------------------------------
+    // 7. SCROLL REVEAL & ANIMATED COUNTERS
+    // -----------------------------------------------------------------------
+    function initScrollAnimations() {
+      const observer = new IntersectionObserver(
+        entries => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("visible");
+              // Animate any skill bars inside
+              entry.target.querySelectorAll(".skill-fill").forEach(bar => {
+                bar.style.width = bar.dataset.width;
+              });
+            }
+          });
+        },
+        { threshold: 0.12 }
+      );
+
+      document.querySelectorAll(".reveal").forEach(el => observer.observe(el));
+
+      // Animate KPI counters
+      document.querySelectorAll(".counter").forEach(counter => {
+        const target = parseInt(counter.dataset.target, 10);
+        let current = 0;
+        const step = Math.max(1, Math.ceil(target / 35));
+        const timer = setInterval(() => {
+          current += step;
+          if (current >= target) {
+            counter.textContent = target;
+            clearInterval(timer);
+          } else {
+            counter.textContent = current;
+          }
+        }, 30);
+      });
+    }
+
+    // Close modals on Escape key
+    document.addEventListener("keydown", e => {
+      if (e.key === "Escape") {
+        closeLightbox();
+        closeCustomizerModal();
+      }
+    });
+
+    // Boot Application on Window Load
+    window.onload = function () {
+      applySocialLinks();
+      renderProjects();
+      initTelemetryCanvas();
+      initScrollAnimations();
+    };
+  </script>
+</body>
+</html>
